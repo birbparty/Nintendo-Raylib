@@ -879,6 +879,7 @@ void InitWindow(int width, int height, const char *title)
     // Initialize base path for storage
     CORE.Storage.basePath = GetWorkingDirectory();
 
+#if !defined(PLATFORM_CTR)  // CTR: rlgl uninitialized; citro2d handles font rendering
 #if defined(SUPPORT_MODULE_RTEXT) && defined(SUPPORT_DEFAULT_FONT)
     // Load default font
     // WARNING: External function: Module required: rtext
@@ -905,6 +906,7 @@ void InitWindow(int width, int height, const char *title)
         rlTextureParameters(GetFontDefault().texture.id, RL_TEXTURE_MAG_FILTER, RL_TEXTURE_FILTER_LINEAR);
     }
 #endif
+#endif // !PLATFORM_CTR
 
 #if defined(PLATFORM_RPI) || defined(PLATFORM_DRM)
     // Initialize raw input system
@@ -966,11 +968,13 @@ void CloseWindow(void)
     }
 #endif
 
+#if !defined(PLATFORM_CTR)  // CTR: rlgl/default font never initialized (see InitWindow patch)
 #if defined(SUPPORT_MODULE_RTEXT) && defined(SUPPORT_DEFAULT_FONT)
     UnloadFontDefault();        // WARNING: Module required: rtext
 #endif
 
     rlglClose();                // De-init rlgl
+#endif // !PLATFORM_CTR
 
 #if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB) || defined(PLATFORM_NX)
     glfwDestroyWindow(CORE.Window.handle);
@@ -3978,6 +3982,15 @@ static bool InitGraphicsDevice(int width, int height)
     CORE.Window.screen.width = width;            // User desired width
     CORE.Window.screen.height = height;          // User desired height
     CORE.Window.screenScale = MatrixIdentity();  // No draw scaling required by default
+
+#if defined(PLATFORM_CTR)
+    // rlLoadExtensions is skipped for CTR so GLAD function pointers remain NULL.
+    // Returning here prevents rlglInit from faulting through a NULL glGenTextures.
+    // Rendering is done via citro3d/citro2d from Nim game code directly.
+    CORE.Window.currentFbo.width  = width;
+    CORE.Window.currentFbo.height = height;
+    return true;
+#endif
 
     // NOTE: Framebuffer (render area - CORE.Window.render.width, CORE.Window.render.height) could include black bars...
     // ...in top-down or left-right to match display aspect ratio (no weird scalings)
